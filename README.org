@@ -1,0 +1,9 @@
+* dependency
+clipmenu xdotool
+
+* usage
+bind a key with your window manager to run command: erofi clipboard
+
+* related
+https://sr.ht/~trs-80/rofi-in-elisp
+https://github.com/ginqi7/global-interactive-emacs

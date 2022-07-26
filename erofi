@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# -c, --create-frame    	      Create a new frame
+# -F ALIST, --frame-parameters=ALIST  Set the parameters of a new frame
+emacsclient -c -F '((name . "floating") (width . 90) (height . 20) (vertical-scroll-bars . nil) (minibuffer . only))' -e "(rofi-in-elisp \"$1\")"
