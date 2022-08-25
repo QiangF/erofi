@@ -12,6 +12,15 @@ from Xlib import X, display
 from time import sleep
 import ewmh
 
+def notify(string):
+    runCommand(["notify-send", string])
+
+def runCommand(command):
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        raise Exception("could not run command: {}\nresult: {}".format(command, result))
+    return(result.stdout.decode("utf8"))
+
 def unmaximize(win):
     ewmh.setWmState(win, 0, "_NET_WM_STATE_MAXIMIZED_VERT")
     ewmh.setWmState(win, 0, "_NET_WM_STATE_MAXIMIZED_HORZ")
@@ -83,8 +92,10 @@ def getLayoutPath(time):
     return os.path.join(layoutDir, str(round(time.timestamp())))
 
 def saveWindows(filename, windows):
-    with open(os.path.join(layoutDir, filename), mode="wb") as b:
-        pickle.dump(windows, b)
+    # Don't save empty layout.
+    if len(windows) > 0:
+        with open(os.path.join(layoutDir, filename), mode="wb") as b:
+            pickle.dump(windows, b)
 
 def loadWindows(filename):
     with open(os.path.join(layoutDir, filename), mode='rb') as b:
@@ -107,6 +118,9 @@ def winner(i):
     savedGeos = loadWindows(filename)
     if (not savedGeos == currentGeos):
         restoreLayout(savedGeos)
+        notify("File name: {}!".format(filename))
+    else:
+        notify("Same layouts!")
     # change mtime of filename to current time
     setFileMtime(os.path.join(layoutDir, filename), now)
     if newRun:
@@ -115,22 +129,18 @@ def winner(i):
     return
 
 def newOrCycle(layoutFiles):
-    if (now.timestamp() - lastRunTime) < checkPeriod:
-        winner(-1)
-    else:
-        filesByNameAscending = sorted(layoutFiles)
-        isNew = True
-        for f in layoutFiles:
-            if set(loadWindows(f)) == set(currentGeos):
-                winner(-1)
-                return
-        filename = getLayoutPath(now)
-        saveWindows(filename, currentGeos)
-        if layoutNumber == maxLayoutNumber:
-            os.remove(os.path.join(layoutDir, filesByNameAscending[0]))
-            # skip the just added layout
-            winner(-2)
-        return
+    filesByNameAscending = sorted(layoutFiles)
+    isNew = True
+    for f in layoutFiles:
+        if set(loadWindows(f)) == set(currentGeos):
+            # no duplicate layout
+            os.rename(f, getLayoutPath(now))
+            return
+    filename = getLayoutPath(now)
+    saveWindows(filename, currentGeos)
+    notify("New layouts! {} {}".format(filename, currentGeos))
+    if layoutNumber == maxLayoutNumber:
+        os.remove(os.path.join(layoutDir, filesByNameAscending[0]))
 
 ewmh = ewmh.EWMH()
 currentDesktop = ewmh.getCurrentDesktop()
