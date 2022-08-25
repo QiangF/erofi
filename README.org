@@ -1,9 +1,40 @@
-* dependency
+* erofi
+erofi is a rofi/dmenu like command completion dialogue pop up using emacs frame.
+
+** dependency
 clipmenu xdotool
 
-* usage
+** usage
 bind a key with your window manager to run command: erofi clipboard
 
-* related
+** related
 https://sr.ht/~trs-80/rofi-in-elisp
 https://github.com/ginqi7/global-interactive-emacs
+
+* eyebrowse.sh
+eyebrowse.sh extends the concept of layout management in emacs eyebrowse package to a stacking window manager.
+
+** dependency
+python-xlib
+
+** usage
+set keybinding in your window manager, an example for openbox:
+
+    <keybind key="W-8">
+      <action name="Execute">
+        <name>last window layout</name>
+        <command>eyebrowse.py last</command>
+      </action>
+    </keybind>
+    <keybind key="W-9">
+      <action name="Execute">
+        <name>next window layout</name>
+        <command>eyebrowse.py next</command>
+      </action>
+    </keybind>
+    <keybind key="W-0">
+      <action name="Execute">
+        <name>last window layout</name>
+        <command>eyebrowse.py new</command>
+      </action>
+    </keybind>
