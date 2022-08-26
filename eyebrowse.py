@@ -32,15 +32,23 @@ def restoreLayout(savedGeos):
     savedWids = [geo[0] for geo in savedGeos]
     matchedWids = set(activeWids).intersection(set(savedWids))
     matchedGeos = []
+    unmatchedGeos = []
     widsToUnhide = []
     for geo in activeGeos:
         wid = geo[0]
         win = ewmh.display.create_resource_object('window', wid)
         if wid in matchedWids:
             matchedGeos.append(geo)
+        else:
+            unmatchedGeos.append(geo)
         if '_NET_WM_STATE_HIDDEN' in ewmh.getWmState(win, True):
             widsToUnhide.append(wid)
     geosToResize = list(set(savedGeos).difference(set(matchedGeos)))
+    # hide unmatched windows, which interferes with layout (visible windows) test
+    for geo in unmatchedGeos:
+        wid, x, y, w, h, wmclass = geo
+        win = ewmh.display.create_resource_object('window', wid)
+        ewmh.setWmState(win, 1, '_NET_WM_STATE_HIDDEN')
     for geo in savedGeos:
         wid, x, y, w, h, wmclass = geo
         if wid in matchedWids:
@@ -58,7 +66,7 @@ def restoreLayout(savedGeos):
                 # move resize window
                 win.configure(x=x, y=y, width=w, height=h)
             win.configure(stack_mode=X.Above)
-    ewmh.display.sync()
+    ewmh.display.flush()
 
 def getWindows(currentDesktopOnly=False, save=False):
     wins = ewmh.getClientListStacking()
@@ -96,7 +104,7 @@ def getWindows(currentDesktopOnly=False, save=False):
 # layout functions
 def setFileMtime(file_path, dt):
     dtEpoch = dt.timestamp()
-    # times is a tuple (atime, mtime)
+    # times is a tuple (atime, mtime) in second
     os.utime(file_path, (dtEpoch, dtEpoch))
 
 def getLayoutPath(time):
@@ -112,18 +120,34 @@ def loadWindows(filename):
     with open(os.path.join(layoutDir, filename), mode='rb') as b:
         return(pickle.load(b))
 
-def winner(i):
+def winner(i, layoutFiles):
     filesByMtimeAscending = sorted(layoutFiles, key=lambda t: os.stat(os.path.join(layoutDir, t)).st_mtime)
-    filesByNameAscending = sorted(layoutFiles)
     lastAccessedFilename = filesByMtimeAscending[-1]
-    lastAccessedLayoutIndex = filesByNameAscending.index(lastAccessedFilename)
-    newRun = False
-    # in a continuous run
-    if (abs(i) <= 1) and ((now.timestamp() - lastRunTime) < checkPeriod):
-        fileID = lastAccessedLayoutIndex + i
-    else:
+    if (now.timestamp() - lastRunTime) > checkPeriod:
         newRun = True
-        fileID = i
+        period = (now.timestamp() - lastRunTime)
+        # rename last accessed file, make sure the more used layoutFiles are closer to the tip
+        os.rename(os.path.join(layoutDir, lastAccessedFilename), getLayoutPath(now))
+        lastAccessedFilename = str(round(now.timestamp()))
+    else:
+        newRun = False
+    # update layoutFiles
+    layoutFiles = os.listdir(layoutDir)
+    filesByNameAscending = sorted(layoutFiles)
+    lastAccessedLayoutIndex = filesByNameAscending.index(lastAccessedFilename)
+    # in a continuous run
+    if newRun:
+        # forward
+        if i > 0:
+            fileID = i - 1
+        else:
+            lastGeos = loadWindows(lastAccessedFilename)
+            if lastGeos == currentGeos:
+                fileID = i - 1
+            else:
+                fileID = i
+    else:
+        fileID = lastAccessedLayoutIndex + i
     fileID %= len(layoutFiles)
     filename = filesByNameAscending[fileID]
     savedGeos = loadWindows(filename)
@@ -133,9 +157,6 @@ def winner(i):
         notify("Same layouts!")
     # change mtime of filename to current time
     setFileMtime(os.path.join(layoutDir, filename), now)
-    if newRun:
-        # rename last accessed file, make sure the more used layoutFiles are closer to the tip
-        os.rename(os.path.join(layoutDir, lastAccessedFilename), getLayoutPath(now))
     return
 
 def newLayout(layoutFiles):
@@ -153,6 +174,8 @@ def newLayout(layoutFiles):
     notify("New layout!")
 
 ewmh = ewmh.EWMH()
+if ewmh.getShowingDesktop() == 1:
+    ewmh.setShowingDesktop(0)
 currentDesktop = ewmh.getCurrentDesktop()
 layoutDir = os.path.join("/tmp/window-layout/", os.environ["USER"], str(currentDesktop))
 now = datetime.now()
@@ -181,8 +204,8 @@ if __name__ == '__main__':
             newLayout(layoutFiles)
         else:
             if op == "next":
-                winner(1)
+                winner(1, layoutFiles)
             elif op == "last":
-                winner(-1)
+                winner(-1, layoutFiles)
             else:
                 raise Exception("unknown operation: " + op)
