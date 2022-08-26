@@ -27,14 +27,19 @@ def unmaximize(win):
     ewmh.setWmState(win, 0, "_NET_WM_STATE_FULLSCREEN")
 
 def restoreLayout(savedGeos):
-    allGeos = getWindows()
-    allWids = [geo[0] for geo in allGeos]
+    activeGeos = getWindows()
+    activeWids = [geo[0] for geo in activeGeos]
     savedWids = [geo[0] for geo in savedGeos]
-    matchedWids = set(allWids).intersection(set(savedWids))
+    matchedWids = set(activeWids).intersection(set(savedWids))
     matchedGeos = []
-    for geo in allGeos:
-        if geo[0] in matchedWids:
+    widsToUnhide = []
+    for geo in activeGeos:
+        wid = geo[0]
+        win = ewmh.display.create_resource_object('window', wid)
+        if wid in matchedWids:
             matchedGeos.append(geo)
+        if '_NET_WM_STATE_HIDDEN' in ewmh.getWmState(win, True):
+            widsToUnhide.append(wid)
     geosToResize = list(set(savedGeos).difference(set(matchedGeos)))
     for geo in savedGeos:
         wid, x, y, w, h, wmclass = geo
@@ -44,6 +49,8 @@ def restoreLayout(savedGeos):
             if desktop != currentDesktop:
                 # bring window on other desktop to current desktop
                 ewmh.setWmDesktop(win, currentDesktop)
+            if wid in widsToUnhide:
+                ewmh.setWmState(win, 0, '_NET_WM_STATE_HIDDEN')
             if geo in geosToResize:
                 wid, x, y, w, h, wmclass = geo
                 win = ewmh.display.create_resource_object('window', wid)
@@ -53,7 +60,7 @@ def restoreLayout(savedGeos):
             win.configure(stack_mode=X.Above)
     ewmh.display.sync()
 
-def getWindows(currentDesktopOnly=False):
+def getWindows(currentDesktopOnly=False, save=False):
     wins = ewmh.getClientListStacking()
     filteredWins = []
     for win in wins:
@@ -63,6 +70,10 @@ def getWindows(currentDesktopOnly=False):
         # remove invisible win
         if win.get_attributes().map_state == X.IsUnviewable:
             continue
+        if save:
+            # remove hidden win
+            if '_NET_WM_STATE_HIDDEN' in ewmh.getWmState(win, True):
+                continue
         if win.get_wm_class()[1] in set(['Tint2', 'Polybar', 'VirtualBox Machine']):
             continue
         filteredWins += [win]
@@ -118,7 +129,6 @@ def winner(i):
     savedGeos = loadWindows(filename)
     if (not savedGeos == currentGeos):
         restoreLayout(savedGeos)
-        notify("File name: {}!".format(filename))
     else:
         notify("Same layouts!")
     # change mtime of filename to current time
@@ -128,7 +138,7 @@ def winner(i):
         os.rename(os.path.join(layoutDir, lastAccessedFilename), getLayoutPath(now))
     return
 
-def newOrCycle(layoutFiles):
+def newLayout(layoutFiles):
     filesByNameAscending = sorted(layoutFiles)
     isNew = True
     for f in layoutFiles:
@@ -138,9 +148,9 @@ def newOrCycle(layoutFiles):
             return
     filename = getLayoutPath(now)
     saveWindows(filename, currentGeos)
-    notify("New layouts! {} {}".format(filename, currentGeos))
     if layoutNumber == maxLayoutNumber:
         os.remove(os.path.join(layoutDir, filesByNameAscending[0]))
+    notify("New layout!")
 
 ewmh = ewmh.EWMH()
 currentDesktop = ewmh.getCurrentDesktop()
@@ -156,7 +166,7 @@ else:
 layoutFiles = os.listdir(layoutDir)
 layoutNumber = len(layoutFiles)
 maxLayoutNumber = 8
-currentGeos = getWindows(True)
+currentGeos = getWindows(True, True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Save and load window layouts")
@@ -165,10 +175,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     op = args.operation[0]
     if op == "new":
-        newOrCycle(layoutFiles)
+        newLayout(layoutFiles)
     else:
         if layoutNumber == 0:
-            newOrCycle(layoutFiles)
+            newLayout(layoutFiles)
         else:
             if op == "next":
                 winner(1)

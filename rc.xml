@@ -977,6 +977,11 @@
     </application>
     <application class="Firefox*">
       <maximized>true</maximized>
+      <desktop>all</desktop>
+    </application>
+    <application class="Emacs">
+      <maximized>true</maximized>
+      <desktop>all</desktop>
     </application>
     <application class="Iwgtk">
       <maximized>true</maximized>

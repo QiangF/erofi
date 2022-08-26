@@ -489,5 +489,5 @@ class EWMH:
         return 0, 0, 0, 0
 
     def isMinimized(self, win):
-        window_state = ewmh.getWmState(win)
+        window_state = self.getWmState(win, True)
         return '_NET_WM_STATE_HIDDEN' in window_state
