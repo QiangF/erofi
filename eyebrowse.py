@@ -66,6 +66,8 @@ def restoreLayout(savedGeos):
                 # move resize window
                 win.configure(x=x, y=y, width=w, height=h)
             win.configure(stack_mode=X.Above)
+    # set the input focus
+    ewmh.setActiveWindow(win)
     ewmh.display.flush()
 
 def getWindows(currentDesktopOnly=False, save=False):
